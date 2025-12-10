@@ -1,17 +1,42 @@
 {
   "name": "pr-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A Slack bot for managing Pull Requests with team notifications and cleanup.",
+  "main": "dist/index.js",
   "type": "module",
-  "scripts": {
-    "start": "node index.js"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EmilAndersson1/pr-bot.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "slack",
+    "bot",
+    "pr",
+    "automation"
+  ],
+  "author": "Emil Andersson",
   "license": "ISC",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
   "dependencies": {
     "@slack/bolt": "^4.6.0",
     "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.49.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.7.4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0"
   }
 }
