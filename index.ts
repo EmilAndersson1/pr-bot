@@ -24,13 +24,15 @@ const REACTIONS = {
     COMMENT: "speech_balloon",
     APPROVED: "white_check_mark",
     MERGED: "merged",
+    UPDATED: "repeat",
 } as const;
 
 const MESSAGES = {
-    COMMENT_OWN: (id: string) => `<@${id}>, someone made a comment or two on your PR.`,
+    COMMENT_OWN: (authorId: string, reviewerId: string) =>
+        `<@${authorId}>, a comment or two was left on your PR by <@${reviewerId}>.`,
     COMMENT_OTHER: "Someone made a comment or two on this PR.",
-    APPROVED_OWN: (id: string) => `<@${id}>, your PR has been approved, time to ship it!`,
-    APPROVED_OTHER: "This PR has been approved, time to ship it!",
+    APPROVED_OWN: (id: string) => `<@${id}>, your PR has been approved, time to ship it! :shipit:`,
+    APPROVED_OTHER: "This PR has been approved, time to ship it! :shipit:",
     MERGED_WARNING:
         "This PR entry will be deleted in 30 seconds. Remove the :merged: reaction to cancel.",
     MERGED_WARNING_OWN: (id: string) =>
@@ -44,8 +46,8 @@ function formatComplexity(level: string | undefined): string {
     if (!level) return "⚪ *Unknown*";
 
     switch (level.toLowerCase()) {
-        case "small":
-            return "🟩 *Small*";
+        case "ez":
+            return ":ez:";
         case "medium":
             return "🟨 *Medium*";
         case "large":
@@ -96,7 +98,7 @@ app.command("/pr", async ({ command, ack, respond, client, logger }) => {
     if (!prUrl) {
         await respond({
             response_type: "ephemeral",
-            text: "Usage: /pr <url> [complexity]\nExample: `/pr https://github.com/... small`",
+            text: "Usage: /pr <url> [complexity]\nExample: `/pr https://github.com/... ez`",
         });
         return;
     }
@@ -104,17 +106,12 @@ app.command("/pr", async ({ command, ack, respond, client, logger }) => {
     try {
         await client.chat.postMessage({
             channel: command.channel_id,
-            text: `We have a new PR!
-
+            text:
+                `Link: <${prUrl}|Link to PR on GitHub>
 Author: <@${command.user_id}>
-Complexity: ${complexity}
-Link: ${prUrl}`,
+Complexity: ${complexity}`,
         });
 
-        await respond({
-            response_type: "ephemeral",
-            text: `Posted PR to <#${command.channel_id}>`,
-        });
     } catch (err) {
         logger.error(err);
         await respond({
@@ -158,21 +155,26 @@ app.event("reaction_added", async ({ event, client, logger }) => {
             const authorId = getAuthorIdFromText(message.text || "");
 
             /* -------------------------------------------
-               :speech_balloon: → Comment notification
+               :speech_balloon: -> Comment notification
             ------------------------------------------- */
             if (event.reaction === REACTIONS.COMMENT) {
-                const text = authorId ? MESSAGES.COMMENT_OWN(authorId) : MESSAGES.COMMENT_OTHER;
+                const reviewerId = event.user;
+
+                const text = authorId
+                    ? MESSAGES.COMMENT_OWN(authorId, reviewerId)
+                    : MESSAGES.COMMENT_OTHER;
 
                 await client.chat.postMessage({
                     channel,
                     thread_ts: ts,
                     text,
                 });
+
                 return;
             }
 
             /* -------------------------------------------
-               :white_check_mark: → Approval notification
+               :white_check_mark: -> Approval notification
             ------------------------------------------- */
             if (event.reaction === REACTIONS.APPROVED) {
                 const text = authorId ? MESSAGES.APPROVED_OWN(authorId) : MESSAGES.APPROVED_OTHER;
@@ -186,7 +188,48 @@ app.event("reaction_added", async ({ event, client, logger }) => {
             }
 
             /* -------------------------------------------
-               :merged: → Start deletion timer
+                :repeat: -> Author says “comments fixed”
+            ------------------------------------------- */
+            if (event.reaction === REACTIONS.UPDATED) {
+                const replies = await client.conversations.replies({
+                    channel,
+                    ts,
+                    limit: 100,
+                });
+
+                const reviewers = new Set<string>();
+
+                const reviewerRegex = /left on your PR by <@([A-Z0-9]+)>/;
+
+                for (const msg of replies.messages || []) {
+                    const match = msg.text?.match(reviewerRegex);
+                    if (match) reviewers.add(match[1]);
+                }
+
+
+                if (reviewers.size === 0) {
+                    await client.chat.postMessage({
+                        channel,
+                        thread_ts: ts,
+                        text: "Updates were made, but no reviewers were detected.",
+                    });
+                    return;
+                }
+
+                const mentions = [...reviewers].map(id => `<@${id}>`).join(" ");
+
+                await client.chat.postMessage({
+                    channel,
+                    thread_ts: ts,
+                    text: `${mentions} - The PR author has updated the PR - please review again`,
+                });
+
+                return;
+            }
+
+
+            /* -------------------------------------------
+                :merged: -> Start deletion timer
             ------------------------------------------- */
             if (event.reaction === REACTIONS.MERGED) {
                 // Check if deletion was cancelled while we were fetching history
