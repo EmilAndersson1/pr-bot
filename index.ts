@@ -1,16 +1,6 @@
 import bolt from "@slack/bolt";
 import dotenv from "dotenv";
 
-console.log("ENV CHECK:", {
-    hasToken: Boolean(process.env.SLACK_BOT_TOKEN),
-    hasSigning: Boolean(process.env.SLACK_SIGNING_SECRET),
-    tokenPrefix: process.env.SLACK_BOT_TOKEN?.slice(0, 4),
-});
-if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_SIGNING_SECRET) {
-    console.error("Missing required env vars. Exiting.");
-    process.exit(1);
-}
-
 const { App, ExpressReceiver } = bolt;
 
 dotenv.config();
