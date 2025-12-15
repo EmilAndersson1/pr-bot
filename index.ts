@@ -103,6 +103,25 @@ async function updateChannelTopic(client: any, channelId: string) {
             topic,
         });
 
+        // Cleanup: The bot setting the topic creates a "User set the channel topic..." message.
+        // We try to catch and delete it immediately to keep the channel clean.
+        try {
+            const history = await client.conversations.history({
+                channel: channelId,
+                limit: 1,
+            });
+            const lastMsg = history.messages?.[0];
+            if (lastMsg && lastMsg.subtype === "channel_topic") {
+                await client.chat.delete({
+                    channel: channelId,
+                    ts: lastMsg.ts!,
+                });
+            }
+        } catch (cleanupError) {
+            // Non-critical: just log it
+            console.error("Failed to cleanup topic message:", cleanupError);
+        }
+
     } catch (error) {
         console.error("Failed to update channel topic:", error);
     }
