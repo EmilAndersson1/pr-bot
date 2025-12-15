@@ -66,6 +66,49 @@ function getAuthorIdFromText(text: string): string | null {
 }
 
 /* ----------------------------
+   Helper: Update Channel Topic
+----------------------------- */
+async function updateChannelTopic(client: any, channelId: string) {
+    try {
+        // Fetch recent history to count active PRs
+        const result = await client.conversations.history({
+            channel: channelId,
+            limit: 100,
+        });
+
+        const messages = result.messages || [];
+        let ezCount = 0;
+        let mediumCount = 0;
+        let largeCount = 0;
+
+        for (const msg of messages) {
+            // Filter for messages from this bot that contain "Complexity:"
+            // We use a loose check on text to catch our PR posts
+            if (msg.bot_id && msg.text && msg.text.includes("Complexity:")) {
+                const text = msg.text.toLowerCase();
+                if (text.includes(":ez:")) {
+                    ezCount++;
+                } else if (text.includes("medium")) {
+                    mediumCount++;
+                } else if (text.includes("large")) {
+                    largeCount++;
+                }
+            }
+        }
+
+        const topic = `PR Stats: :ez: ${ezCount} | 🟨 Medium: ${mediumCount} | 🟥 Large: ${largeCount}`;
+
+        await client.conversations.setTopic({
+            channel: channelId,
+            topic,
+        });
+
+    } catch (error) {
+        console.error("Failed to update channel topic:", error);
+    }
+}
+
+/* ----------------------------
    Slack Receiver (custom endpoints)
 ----------------------------- */
 const receiver = new ExpressReceiver({
@@ -111,6 +154,9 @@ app.command("/pr", async ({ command, ack, respond, client, logger }) => {
 Author: <@${command.user_id}>
 Complexity: ${complexity}`,
         });
+
+        // Update the channel topic with new stats
+        await updateChannelTopic(client, command.channel_id);
 
     } catch (err) {
         logger.error(err);
