@@ -168,8 +168,9 @@ app.command("/pr", async ({ command, ack, respond, client, logger }) => {
     try {
         await client.chat.postMessage({
             channel: command.channel_id,
+            unfurl_links: false,
             text:
-                `Link: <${prUrl}|Link to PR on GitHub>
+                `Link: <${prUrl}>
 Author: <@${command.user_id}>
 Complexity: ${complexity}`,
         });
