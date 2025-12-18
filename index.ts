@@ -58,6 +58,23 @@ function formatComplexity(level: string | undefined): string {
 }
 
 /* ----------------------------
+   Helper: Format PR Link
+   ----------------------------- */
+function formatPrLink(url: string): string {
+    try {
+        const match = url.match(/\/([^\/]+)\/pull\/(\d+)/);
+        if (match) {
+            const repo = match[1];
+            const prNum = match[2];
+            return `<${url}|${repo} #${prNum}>`;
+        }
+    } catch (e) {
+        // ignore errors, fallback
+    }
+    return `<${url}>`;
+}
+
+/* ----------------------------
    Helper: Parse author from message text
 ----------------------------- */
 function getAuthorIdFromText(text: string): string | null {
@@ -154,25 +171,57 @@ app.command("/pr", async ({ command, ack, respond, client, logger }) => {
 
     const parts = command.text.split(/\s+/);
     const prUrl = parts[0];
-    const complexityRaw = parts[1]; // may be undefined
+
+    // Helper: Check if a string is a valid complexity
+    const isComplexity = (str: string | undefined): boolean => {
+        if (!str) return false;
+        return ["ez", "medium", "large"].includes(str.toLowerCase());
+    };
+
+    let complexityRaw: string | undefined;
+    let messageText = "";
+
+    // 2nd argument logic:
+    // If it exists AND is a known complexity -> verify complexity
+    // Else -> treat as start of a custom message
+    if (parts.length > 1) {
+        const potentialComplexity = parts[1];
+        if (isComplexity(potentialComplexity)) {
+            complexityRaw = potentialComplexity;
+            // The rest is the message
+            messageText = parts.slice(2).join(" ");
+        } else {
+            // No complexity provided, everything after URL is message
+            messageText = parts.slice(1).join(" ");
+        }
+    }
+
     const complexity = formatComplexity(complexityRaw);
 
     if (!prUrl) {
         await respond({
             response_type: "ephemeral",
-            text: "Usage: /pr <url> [complexity]\nExample: `/pr https://github.com/... ez`",
+            text: "Usage: /pr <url> [complexity] [optional message]\nExample: `/pr https://github.com/... ez Please review logic`",
         });
         return;
     }
 
     try {
+        const linkText = formatPrLink(prUrl);
+        const textLines = [
+            `Link: ${linkText}`,
+            `Author: <@${command.user_id}>`,
+            `Complexity: ${complexity}`,
+        ];
+
+        if (messageText) {
+            textLines.push(`Info: ${messageText}`);
+        }
+
         await client.chat.postMessage({
             channel: command.channel_id,
             unfurl_links: false,
-            text:
-                `Link: <${prUrl}>
-Author: <@${command.user_id}>
-Complexity: ${complexity}`,
+            text: textLines.join("\n"),
         });
 
         // Update the channel topic with new stats
