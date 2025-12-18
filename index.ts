@@ -221,6 +221,7 @@ app.command("/pr", async ({ command, ack, respond, client, logger }) => {
         await client.chat.postMessage({
             channel: command.channel_id,
             unfurl_links: false,
+            link_names: true,
             text: textLines.join("\n"),
         });
 
