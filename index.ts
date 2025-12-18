@@ -425,6 +425,9 @@ app.event("reaction_added", async ({ event, client, logger }) => {
                         // 3. Delete Parent PR message
                         await client.chat.delete({ channel, ts });
 
+                        // Update the channel topic with new stats
+                        await updateChannelTopic(client, channel);
+
                         // Warning message is likely already deleted if it was in the thread,
                         // but we can try just in case it wasn't caught
                         if (warnMsg.ts) {
